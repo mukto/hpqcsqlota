@@ -1,0 +1,599 @@
+// 1. Transition Rules joined with Groups					
+					
+SELECT GR_GROUP_NAME, TR_RULES					
+					
+FROM GROUPS					
+					
+INNER JOIN TRAN_RULES ON GR_GROUP_ID = TR_GROUP_ID					
+
+
+================================
+// 2. Find Test Set IDs
+SELECT DISTINCT TC_CYCLE_ID FROM TESTCYCL					
+					
+WHERE TC_ASSIGN_RCYC In (1047, 1040, 1046, 1048, 1045, 1041, 1042, 1043, 1044, 1049, 1050, 1051, 1052, 1053, 1054, 1055, 1056, 1057, 
+1058, 1059, 1060, 1061, 1062, 1063, 1064))"					
+
+
+======================================================
+//3. Find the folder path 		
+
+SELECT				
+CF_ITEM_NAME as "Test Lab Folder Name",				
+CF_ITEM_PATH as "Folder path",				
+CF_ITEM_ID as "Folder ID"				
+FROM CYCL_FOLD				
+order by CF_ITEM_PATH				
+
+=======================================================
+//4. Bug Counts
+Bug Counts		
+SELECT 		
+     SUM(CASE WHEN column1 IS NOT NULL THEN 1 ELSE 0 END) AS column1_count		
+    ,SUM(CASE WHEN column2 IS NOT NULL THEN 1 ELSE 0 END) AS column2_count		
+    ,SUM(CASE WHEN column3 IS NOT NULL THEN 1 ELSE 0 END) AS column3_count		
+FROM table		
+
+=========================================================
+//5. BUG Linked and Unlinked
+
+"SELECT BG_BUG_ID, LN_LINK_ID
+
+FROM BUG
+
+LEFT JOIN LINK ON LN_BUG_ID = BG_BUG_ID
+
+ORDER BY BG_BUG_ID DESC"
+
+=======================================================
+// 6. The following code is to get step level defect link to test set level defect link.    		
+//In ActionCanExecute Sub: 
+
+if ActionName = ""StepsView.NewDefect"" Then"		
+   Set us = TDConnection.UserSettings		
+   us.Open "MySettings"		
+'   us.Value("LastTestInstanceID") = TestSetTest_Fields("TC_TESTCYCL_ID").Value		
+    us.Value("LastTestInstanceID") = Run_Fields("RN_TESTCYCL_ID").Value		
+   us.Close		
+   us.Post		
+   Set us = Nothing		
+End If		
+		
+if ActionName = "act_end_run" or ActionName = "RfrshAct" Then		
+   Set us = TDConnection.UserSettings		
+   us.Open "MySettings"		
+   us.DeleteValue "LastTestInstanceID"		
+   us.Close		
+   us.Post		
+   Set us = Nothing		
+End If		
+
+===========================================================================
+// 7. Test Exec Report with bugs
+SELECT 
+v.LN_BUG_ID As 'Defect ID',
+RCYC_NAME As 'Stream',
+"--CY_CYCLE as "Test Set Name",
+TS_NAME As 'Test Case Name',
+TESTCYCL.TC_PLAN_SCHEDULING_DATE As 'Planned Execution Date',
+TESTCYCL.TC_ACTUAL_TESTER as 'Actual Tester',
+t.TS_EXEC_STATUS As 'Test Status',
+
+--BUG.BG_BUG_ID As 'Defect ID',
+BUG.BG_SUMMARY As 'Defect Summary',
+BUG.BG_SEVERITY As 'Defect Severity',
+BUG.BG_STATUS As 'Defect Status'
+
+
+
+FROM TEST t
+LEFT JOIN  V_LINK_TEST v ON t.TS_TEST_ID = v.LN_TEST_ID
+LEFT JOIN TESTCYCL ON TS_TEST_ID = TC_TEST_ID
+LEFT JOIN RELEASE_CYCLES ON TC_ASSIGN_RCYC = RCYC_ID
+LEFT JOIN CYCLE ON RCYC_ID = CY_ASSIGN_RCYC
+LEFT JOIN BUG ON LN_BUG_ID = BG_BUG_ID
+// #NAME?
+WHERE (v.LN_BUG_ID IS NOT NULL) 
+// #NAME?
+ORDER BY  v.LN_BUG_ID DESC
+
+// #NAME?
+
+===========================================================
+// 8. Audit
+SELECT * FROM AUDIT_LOG
+WHERE AU_ENTITY_TYPE = 'TESTCYCL' AND AU_ACTION = 'DELETE'
+
+============================================================
+
+// 9. Make Closed Defect's fields Readable
+
+Sub Bug_MoveTo
+If Bug_Fields("BG_STATUS").Value = "Closed" Then
+  For i= 0 To Bug_Fields.Count
+    Bug_Fields.FieldByID(i).IsReadOnly = True
+  Next
+End If
+End Sub
+
+=================================================================
+// 10. Get a list of users and groups from a project		
+SELECT US_USERNAME, GR_GROUP_NAME		
+FROM USERS, GROUPS		
+WHERE GR_IS_SYSTEM = 'N'		
+AND		
+US_USERNAME <> '_system_user_'		
+AND SUBSTRING(US_GROUP, GR_GROUP_ID+1, 1) = '1'		
+ORDER BY US_USERNAME		
+
+====================================================================
+// 11. Make One Field Required Based on Other field's value
+Sub Bug_MoveTo
+  On Error Resume Next
+
+    If FieldName= "BG_STATUS" then
+            If Bug_Fields("BG_STATUS").value="Deferred" then
+                Bug_Fields("BG_USER_22").IsRequired=True
+                'Bug_Fields("BG_DEV_COMMENTS").IsRequired = False
+            Else
+                   Bug_Fields("BG_USER_22").IsRequired=False
+            End If
+  Else
+  End If
+End Sub
+
+========================================================================
+// 12. Get a list of users and groups from a project		
+SELECT US_USERNAME, GR_GROUP_NAME		
+FROM USERS, GROUPS		
+WHERE GR_IS_SYSTEM = 'N'		
+AND		
+US_USERNAME <> '_system_user_'		
+AND SUBSTRING(US_GROUP, GR_GROUP_ID+1, 1) = '1'		
+ORDER BY US_USERNAME		
+
+=========================================================================
+// 13. Audit - Join with Audit_Properties
+SELECT 
+AU_USER As 'User', 
+AU_TIME As 'Time', 
+AU_ACTION As 'Action', 
+AU_ENTITY_TYPE As 'Entity Type', 
+AP_TABLE_NAME As 'Table', 
+AP_FIELD_NAME As 'Field Name', 
+AP_PROPERTY_NAME As 'Property Name', 
+AP_OLD_VALUE As 'Old Value', 
+AP_NEW_VALUE As 'New Value'
+
+FROM AUDIT_LOG
+"INNER JOIN AUDIT_PROPERTIES ON AP_ACTION_ID = AU_ACTION_ID
+ORDER BY AU_TIME DESC"
+
+===========================================================================
+// 14. Test Exec Report with Linked Defects - Final Version
+SELECT DISTINCT
+RCYC_NAME As 'Stream',
+TS_NAME As 'Test Name',
+TESTCYCL.TC_PLAN_SCHEDULING_DATE As 'Planned Execution Date',
+TESTCYCL.TC_EXEC_DATE as 'Actual Execution_Date',
+TESTCYCL.TC_ACTUAL_TESTER as 'Actual Tester',
+t.TS_EXEC_STATUS As 'Test Status',
+v.LN_BUG_ID As 'Defect ID',
+BUG.BG_SUMMARY As 'Defect Summary',
+BUG.BG_SEVERITY As 'Defect Severity',
+BUG.BG_STATUS As 'Defect Status'
+
+===========================================================================
+
+//15. How to Join Defect, Audit_Log and Audit_Properties table
+"select DISTINCT al.AU_ENTITY_ID
+from AUDIT_LOG al
+join AUDIT_PROPERTIES ap on al.AU_ACTION_ID = ap.AP_ACTION_ID
+where al.AU_ENTITY_TYPE = 'BUG' and ap.AP_FIELD_NAME = 'BG_STATUS' and ap.AP_NEW_VALUE = 'Rejected'
+order by al.AU_ENTITY_ID DESC"
+
+
+==================================================================================
+// 16. FROM TEST t
+LEFT JOIN  V_LINK_TEST v ON t.TS_TEST_ID = v.LN_TEST_ID
+LEFT JOIN TESTCYCL ON TS_TEST_ID = TC_TEST_ID
+LEFT JOIN RELEASE_CYCLES ON TC_ASSIGN_RCYC = RCYC_ID
+LEFT JOIN CYCLE ON RCYC_ID = CY_ASSIGN_RCYC
+LEFT JOIN BUG ON LN_BUG_ID = BG_BUG_ID
+WHERE (v.LN_BUG_ID IS NOT NULL) AND (BUG.BG_BUG_ID > 316)
+ORDER BY  v.LN_BUG_ID ASC
+
+
+====================================================================================
+
+// 17. Find defects with status Closed Or Rejected that are linked to test cases with Failed Status				
+SELECT Distinct BUG.BG_BUG_ID as "Defect ID", 				
+BUG.BG_DETECTED_BY as "Detected By", 				
+BUG.BG_SUMMARY as "Defect Name", 				
+BUG.BG_STATUS As 'Bug Status',				
+--BUG.BG_USER_03 as "Application", 				
+--BUG.BG_USER_01 as "Category", 				
+LINK.LN_ENTITY_TYPE as "Type", 				
+TEST.TS_TEST_ID as "Test ID", 				
+TEST.TS_NAME as "Test Name" 				
+--TEST.TS_USER_03 as "Test Category" 				
+				
+FROM LINK, BUG, TEST,STEP 				
+				
+Where (TEST.TS_EXEC_STATUS = 'Failed')				
+AND LINK.LN_BUG_ID = BUG.BG_BUG_ID AND LINK.LN_ENTITY_ID = TS_TEST_ID AND BUG.BG_STATUS in ('Closed', 'Rejected') 				
+--AND BUG.BG_DETECTED_IN_RCYC in ('11', '16', '19') 				
+				
+Order by BUG.BG_BUG_ID DESC				
+
+
+======================================================================================================
+// 18. Identify test cases/steps that failed but do not have linked defects								
+SELECT ts_test_id, ts_name, st_step_order, l.ln_bug_id								
+FROM test t								
+left join step s on s.st_test_id = t.ts_test_id								
+left join link l on l.ln_entity_id = s.st_id								
+where s.st_status = 'Failed'								
+and l.ln_entity_type = 'Step'								
+and ln_bug_id is null								
+
+
+==============================================================================================
+// 19. return all tests not passed that are associated to closed defects
+SELECT BG_BUG_ID,
+BG_STATUS,
+TC_STATUS,
+TEST.TS_RESPONSIBLE,
+TS_NAME,
+TS_STATUS
+
+from (BUG LEFT JOIN LINK ON BG_BUG_ID = LN_BUG_ID )
+LEFT JOIN V_LINK_TESTCYCL on LINK.LN_BUG_ID = V_LINK_TESTCYCL.LN_BUG_ID
+LEFT JOIN CYCLE ON LINK.LN_ENTITY_ID = CY_CYCLE_ID
+LEFT JOIN TESTCYCL on V_LINK_TESTCYCL.LN_TESTCYCL_ID = TC_TESTCYCL_ID
+left join test on tc_test_id = ts_test_id
+
+Where
+
+--BG_STATUS NOT IN ('Closed','Defect Resolved','Rejected')
+BG_STATUS IN ('Closed','Cancel')
+AND LINK.LN_ENTITY_TYPE = 'TESTCYCL'
+AND TC_STATUS NOT IN ('Passed')
+--and BG_DETECTED_IN_RCYC = '162'
+ORDER BY BG_BUG_ID DESC
+
+==========================================================================================
+SELECT 		
+BG_BUG_ID As 'Defect ID',		
+BG_STATUS As 'Defect Status',		
+BG_DETECTED_BY 'Defect Detected By',		
+TC_STATUS As 'Test Case Status',		
+TC_ACTUAL_TESTER 'Tester',		
+TS_NAME As 'Test Case'		
+		
+from BUG 		
+LEFT JOIN LINK ON BG_BUG_ID = LN_BUG_ID 		
+LEFT JOIN V_LINK_TESTCYCL on LINK.LN_BUG_ID = V_LINK_TESTCYCL.LN_BUG_ID		
+LEFT JOIN CYCLE
+ON LINK.LN_ENTITY_ID = CY_CYCLE_ID		
+LEFT JOIN TESTCYCL on V_LINK_TESTCYCL.LN_TESTCYCL_ID = TC_TESTCYCL_ID		
+left join test on tc_test_id = ts_test_id		
+		
+Where		
+BG_STATUS IN ('Closed','Rejected')		
+AND LINK.LN_ENTITY_TYPE = 'TESTCYCL'		
+AND TC_STATUS NOT IN ('Passed')		
+ORDER BY BG_BUG_ID DESC		
+
+============================================================================================
+// 21. Find out Checked Out Test Cases
+SELECT 'TEST' as TYPE, 
+TS_TEST_Id as ID, 
+TS_NAME as NAME, 
+TS_vC_USER_NAME as QC_USER,
+TS_VC_STATUS as VC_STATUS 
+
+from TEST
+
+ WHERE TS_VC_STATUS = 'Checked_Out'
+ ORDER BY TYPE, NAME
+
+============================================================================
+
+// 22.  Test Exec Count Per Actual Tester						
+SELECT TC_ACTUAL_TESTER as "TESTER", count(TC_Status) as "Total Count",						
+SUM(case when TC_Status = 'Passed' then 1 else 0 end) as "Passed",						
+Sum(case when TC_Status = 'Failed' then 1 else 0 end) as "Failed",						
+Sum(case when TC_Status = 'No Run' then 1 else 0 end) as "No Run",						
+Sum(case when TC_Status = 'Not Completed' then 1 else 0 end) as "Not Completed",						
+Sum(case when TC_Status = 'Blocked' then 1 else 0 end) as "Blocked",						
+Sum(case when TC_Status = 'Passed with a non-critical defect' then 1 else 0 end) as "Passed with a non-critical defect",						
+Sum(case when TC_Status = 'N/A' then 1 else 0 end) as "N/A"						
+From TESTCYCL						
+Where Convert(VARCHAR, TC_EXEC_DATE,101) between '11/01/2017' and '12/31/2017'						
+Group by TC_ACTUAL_TESTER						
+
+===================================================================================
+// 23. Set Defects Grid View by Default. 
+1. First set columns to be visible in Defects module and log out
+2. Second, for the project, run te following SQL query in Site Admin
+update COMMON_SETTINGS set cset_owner = '__default__' 
+where cset_category = 'DefectsModule-000000004243046514' and cset_name = 'ModuleState' and cset_owner = 'skarim'
+
+3. In CanLogin sub/function, add the following code: 
+Set cs = TDConnection.CommonSettings
+Set us = TDConnection.UserSettings
+cs.Open "DefectsModule-000000004243046514"
+us.Open "DefectsModule-000000004243046514"
+us.Value("ModuleState") = cs.Value("ModuleState")
+cs.Close
+us.Post
+us.Close
+Set us = Nothing
+Set cs = Nothing
+
+
+====================================================================================
+
+// 24. Lock Test Sets from Run		
+Select Case ActionName		
+  Case "act_run"		
+    If TestSet_Fields.Field("CY_STATUS").Value = "Closed" Then		
+      ActionCanExecute = False		
+    Else		
+      ActionCanExecute = True		
+    End If		
+		
+   Case "act_run_manually"		
+   If TestSet_Fields.Field("CY_STATUS").Value = "Closed" Then		
+      ActionCanExecute = False		
+   Else		
+       ActionCanExecute = True		
+   End If		
+		
+   Case "act_continue_man_run"		
+   If TestSet_Fields.Field("CY_STATUS").Value = "Closed" Then		
+      ActionCanExecute = False		
+   Else		
+       ActionCanExecute = True		
+   End If		
+		
+    Case "act_run_test_set"		
+    If TestSet_Fields.Field("CY_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+        End If		
+		
+    Case Else		
+         ActionCanExecute = True		
+		
+    End Select		
+		
+		
+' Test Plan - lock certain test cases		
+ Case "act_delete_test"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+        End If		
+		
+ Case "TestPlan.Delete"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+        End If		
+		
+ Case "act_del_step"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+    End If		
+		
+		
+ Case "TestDesignSteps.DeleteSelected"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+    End If		
+		
+Case "act_new_step"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+    End If		
+		
+Case "TestDesignSteps.NewStep"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+    End If		
+		
+Case "act_edit_step"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+    End If		
+		
+Case "TestDesignSteps.EditStep"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+    End If		
+		
+Case "act_renumber_steps"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+    End If		
+		
+Case "TestDesignSteps.RenumberSteps"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+    End If		
+		
+Case "act_attach"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+    End If		
+		
+Case "TestDesignSteps.Attachments"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+    End If		
+		
+Case "act_generate_script"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+    End If		
+		
+Case "TestDesignSteps.GenerateScript"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+    End If		
+		
+Case "act_link_test"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+    End If		
+		
+		
+Case "TestDesignSteps.CallToTest"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+    End If		
+		
+		
+		
+Case "act_edit_step_grid"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+    Else		
+        ActionCanExecute = True		
+    End If		
+		
+Case "TestDesignSteps.EditGrid"		
+    If Test_Fields.Field("TS_STATUS").Value = "Closed" Then		
+       ActionCanExecute = False		
+       
+ Else		
+        ActionCanExecute = True		
+End If		
+===================================================================================
+
+25. //Set Defects Grid View by Default. 
+//1. First set columns to be visible in Defects module and log out
+//2. Second, for the project, run te following SQL query in Site Admin:
+update COMMON_SETTINGS set cset_owner = '__default__' 
+where cset_category = 'DefectsModule-000000004243046514' and cset_name = 'ModuleState' and cset_owner = 'userID'
+
+3. In CanLogin sub/function, add the following code: 
+Set cs = TDConnection.CommonSettings
+Set us = TDConnection.UserSettings
+cs.Open "DefectsModule-000000004243046514"
+us.Open "DefectsModule-000000004243046514"
+us.Value("ModuleState") = cs.Value("ModuleState")
+cs.Close
+us.Post
+us.Close
+Set us = Nothing
+Set cs = Nothing
+
+========================================================================================
+
+// 26. Extract Test Cases from Test Plan Module from a particular folder
+
+SELECT
+
+AL_DESCRIPTION As 'Folder Name',
+TS_TEST_ID As 'Test Case ID',
+TS_NAME 'Test Case Name',
+DS_STEP_NAME As 'Step Name',
+DS_DESCRIPTION As 'Step Description',
+DS_EXPECTED As 'Expected Result'
+
+
+FROM TEST
+
+INNER JOIN ALL_LISTS ON AL_ITEM_ID = TS_SUBJECT
+INNER JOIN DESSTEPS ON DS_TEST_ID = TS_TEST_ID
+
+WHERE AL_ABSOLUTE_PATH LIKE 'AAAAAPAAC%'
+
+ORDER BY AL_ABSOLUTE_PATH ASC
+
+===============================================================================================
+
+// 27. Update Test Configuration Status (TS_STATUS) for all test cases in certain folders in Test Plan
+Update TEST  
+SET TS_STATUS = 'Closed'
+FROM TEST
+INNER JOIN ALL_LISTS ON ALL_LISTS.AL_ITEM_ID = TEST.TS_SUBJECT
+WHERE ALL_LISTS.AL_ABSOLUTE_PATH LIKE 'AAAAAPAAEAAN%'
+
+===================================================================================================
+// 28. Extract Test Cases from Test Lab module for particule cycles
+Select DISTINCT
+CY_CYCLE_ID As 'Test Set ID',
+Test.TS_TEST_ID As 'Test Case ID',
+RCYC_NAME As 'Stream',
+--CF_ITEM_NAME As 'Folder',
+CY_CYCLE As 'Test Set',
+Test.TS_NAME As 'Test Case Name',
+TC_PLAN_SCHEDULING_DATE as 'Planned Exec Date',
+TC_TESTER_NAME As 'Responsible Tester'
+
+From TESTCYCL /*Test Instance*/
+
+INNER Join TEST ON TS_TEST_ID = TC_TEST_ID
+INNER Join RELEASE_CYCLES ON RCYC_ID = TC_ASSIGN_RCYC
+INNER Join RELEASES ON REL_ID = RCYC_PARENT_ID
+INNER Join ALL_LISTS ON AL_ITEM_ID = TS_SUBJECT
+INNER Join CYCLE ON CY_CYCLE_ID = TC_CYCLE_ID
+INNER JOIN CYCL_FOLD ON CF_ASSIGN_RCYC = RCYC_ID
+
+ Where TC_CYCLE_ID In (SELECT DISTINCT TC_CYCLE_ID FROM TESTCYCL
+        WHERE TC_ASSIGN_RCYC In (1094, 1083, 1084, 1085, 1086, 1087, 1088, 1089, 1090, 1091, 1082, 1093))
+
+======================================================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
